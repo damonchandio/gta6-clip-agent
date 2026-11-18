@@ -1,0 +1,4 @@
+# Optional, for fast transcription on an NVIDIA GPU (Windows or Linux):
+#   .venv\Scripts\python -m pip install -r requirements-gpu.txt
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*

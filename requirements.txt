@@ -1,0 +1,7 @@
+requests>=2.31
+python-dotenv>=1.0
+yt-dlp>=2025.1.1
+faster-whisper>=1.1
+opencv-python>=4.9,<5
+imageio-ffmpeg>=0.5
+av>=11,<19          # faster-whisper's audio reader; PyAV 19 changed open() and breaks it
