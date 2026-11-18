@@ -1,5 +1,5 @@
 """Your posting accounts. Each slot is one persona that can be logged in to Instagram, TikTok and YouTube.
-Change ACCOUNTS in .env to have more or fewer than 5. You make and own the accounts; the agent only posts."""
+Set ACCOUNTS in .env to any number you like (5 to start with). You make and own the accounts; the agent only posts."""
 import json
 import os
 import re
@@ -7,7 +7,7 @@ import re
 from . import HOME
 
 FILE = HOME / "accounts.json"
-COUNT = max(1, min(9, int(os.getenv("ACCOUNTS", "5") or 5)))
+COUNT = max(1, int(os.getenv("ACCOUNTS", "5") or 5))
 
 
 def load() -> list[dict]:

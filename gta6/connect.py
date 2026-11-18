@@ -161,7 +161,8 @@ def start(platform: str, slot: int) -> str:
     """The sign-in page to open for this account. Raises with the next step when the app keys are missing."""
     if platform not in PLATFORMS:
         raise ConnectError("unknown platform")
-    if not 1 <= int(slot) <= 9:
+    from clipper import accounts
+    if int(slot) not in {a["slot"] for a in accounts.load()}:
         raise ConnectError("unknown account")
     reload_env()
     cid, secret = keys(platform)

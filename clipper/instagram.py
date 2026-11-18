@@ -76,7 +76,8 @@ def whoami(slot: int) -> dict:
 def refresh_tokens() -> None:
     """Long-lived tokens last 60 days; refresh each one weekly so they never run out."""
     saved = _saved()
-    for slot in range(1, 10):
+    from .accounts import load
+    for slot in [a["slot"] for a in load()]:
         tok = token(slot)
         if not tok:
             continue
