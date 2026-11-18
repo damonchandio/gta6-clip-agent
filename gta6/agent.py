@@ -8,6 +8,7 @@ import logging
 import math
 import random
 import re
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -28,14 +29,17 @@ CHECK_EVERY = 20 * 60
 HOURS = (8, 22)               # when new clips are made
 POST_HOURS = (11, 22)         # when approved clips go out (UK time)
 POST_GAP_MIN = 45             # between two posts on the same account and platform
-POST_PER_DAY = 4              # per account, per platform
+POST_PER_DAY = 10             # per account, per platform
 RETRY_AFTER_MIN = 15
 MAX_TRIES = 3
 BATCH = 3                     # clips made from one video
-MAX_WAITING = 10              # stop making more while this many are waiting for a yes or no
-PER_ACCOUNT_DAY = 4           # clips made per account per day
+MAX_WAITING = 50              # stop making more while this many are waiting for a yes or no
+PER_ACCOUNT_DAY = 10          # clips made per account per day
 MIN_OWN_SECONDS = 20
 MIN_CHANNEL_SECONDS = 240     # skip Shorts and trailers: long videos give real moments to cut
+LIVE_FIRST = (10, 4)          # a stream's first stretch: minutes recorded, clips made (short, so clips arrive early)
+LIVE_NEXT = (30, 6)           # every stretch after that
+_live_seen: set = set()       # streams that have had their first stretch
 RESEARCH_EVERY = 24 * 3600
 SEEDS = ("gta 6", "gta 6 how to", "gta 6 best", "gta 6 funny", "gta 6 secret", "gta 6 vs", "gta vi")
 BAD_TAGS = re.compile(r"tiktok|fyp|foryou|for_you|viral|reels?$|shorts|youtube|trending|explore|subscribe", re.I)
@@ -409,9 +413,71 @@ def say(text: str) -> None:
 
 
 # --- sources ------------------------------------------------------------------------------------------
+def live_now(link: str) -> dict | None:
+    """What a channel (or a stream link) is broadcasting right now, or None when it isn't live."""
+    link = link.split("?si=")[0].rstrip("/")
+    if re.search(r"youtube\.com/(@[^/?]+|channel/[^/?]+|c/[^/?]+|user/[^/?]+)$", link, re.I):
+        link += "/live"
+    elif not re.search(r"watch\?|/live/|youtu\.be/", link, re.I):
+        return None                                               # a playlist can't be live
+    try:
+        import yt_dlp
+        with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True, "noplaylist": True,
+                               "format": "b[height<=1080]/bv*[height<=1080]+ba/b/bv*+ba"}) as y:
+            info = y.extract_info(link, download=False)
+    except Exception as e:  # noqa: BLE001  a channel that isn't live has nothing behind /live
+        log.info("live check on %s: %s", link, str(e).splitlines()[0][:120])
+        return None
+    return info if info.get("is_live") and _streams(info) else None
+
+
+def _streams(info: dict) -> list[str]:
+    """One link when YouTube offers picture and sound together, otherwise one for each."""
+    return [info["url"]] if info.get("url") else [f["url"] for f in info.get("requested_formats") or [] if f.get("url")]
+
+
+def record_live(info: dict, minutes: float) -> Path:
+    """Save the next few minutes of a live stream as a normal video file."""
+    from clipper import engine
+    out = HOME / "live" / f"{info['id']}-{int(time.time())}.mp4"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    agent_ua = (info.get("http_headers") or {}).get("User-Agent") or "Mozilla/5.0"
+    try:
+        inputs = [a for u in _streams(info) for a in ("-user_agent", agent_ua, "-i", u)]
+        subprocess.run([engine.ffmpeg(), "-y", "-loglevel", "error", *inputs,
+                        "-t", str(minutes * 60), "-c", "copy", str(out)], capture_output=True,
+                       timeout=minutes * 60 + 180)
+    except subprocess.TimeoutExpired:
+        pass                                                      # keep whatever was saved
+    if not out.exists() or engine.duration(out) < MIN_OWN_SECONDS:
+        out.unlink(missing_ok=True)
+        raise RuntimeError("the stream gave no video")
+    return out
+
+
 def next_source(st: dict) -> dict | None:
     from clipper import autopilot, engine
     used = set(st["used"])
+    live_ids = set()                                              # never downloaded as a video: that only ends when the stream does
+    for ch in st["channels"]:                                     # a live stream goes first: it's gone once it ends
+        camp = _campaign(st, ch.get("campaign_id")) or ch.get("campaign")
+        info = live_now(ch["url"]) if ch.get("permitted") or camp else None
+        if info:
+            live_ids.add(info.get("id"))
+        if not info or not (camp or GTA.search(info.get("title") or "")):
+            continue
+        minutes, count = LIVE_NEXT if info.get("id") in _live_seen else LIVE_FIRST
+        status["doing"] = f"Recording {minutes} minutes of the live stream '{(info.get('title') or '')[:40]}'"
+        try:
+            note(f"'{(info.get('title') or 'A stream')[:50]}' is live. Recording {minutes} minutes of it.")
+            path = record_live(info, minutes)
+            _live_seen.add(info.get("id"))
+        except Exception as e:  # noqa: BLE001
+            note(f"Couldn't record the live stream on {ch['url']}: {str(e).splitlines()[0][:100]}")
+            continue
+        return {"kind": "campaign" if camp else "creator", "id": "live:" + path.name, "url": str(path), "live": True,
+                "count": count,
+                "title": info.get("title") or "Live stream", "credit": ch.get("credit", ""), "campaign": camp}
     for folder in st["folders"]:                                  # your own captures always go first
         try:
             files = sorted((p for p in Path(folder["path"]).rglob("*") if p.suffix.lower() in VIDEO_EXT),
@@ -445,7 +511,7 @@ def next_source(st: dict) -> dict | None:
             continue
         for v in found:
             long_enough = (v.get("seconds") or 0) >= MIN_CHANNEL_SECONDS or v.get("linked")
-            if v["id"] and v["id"] not in used and long_enough and (camp or GTA.search(v["title"])):
+            if v["id"] and v["id"] not in used and v["id"] not in live_ids and long_enough and (camp or GTA.search(v["title"])):
                 return {"kind": "campaign" if camp else "creator", "id": v["id"], "url": v["url"],
                         "title": v["title"], "credit": ch.get("credit", ""), "campaign": camp}
     return None
@@ -507,13 +573,16 @@ def tick(force: bool = False) -> str:
             status["doing"] = f"{src['title'][:50]}: {msg}"
         note(f"Cutting clips from '{src['title'][:60]}'" + (f" for {src['campaign']['title']}." if src.get("campaign") else "."))
         try:
-            s = engine.make_clips(src["url"], rules_for(src, slot, r), BATCH, progress=progress)
+            s = engine.make_clips(src["url"], rules_for(src, slot, r), src.get("count", BATCH), progress=progress)
         except Exception as e:  # noqa: BLE001
             if src["id"].startswith("link:"):
                 return note(f"Couldn't download {src['url'][:80]}. Download that footage into a capture folder "
                             "tied to the campaign (Sources tab) and I'll clip it from there.")
             raise e
         made = retag(s["job"], src, r)
+        if src.get("live"):
+            Path(src["url"]).unlink(missing_ok=True)           # the recording is only raw material
+            change(lambda s: s.update(last_check=0))           # still live? record the next stretch straight away
         sent = sum(bool(notify_clip(m)) for m in made)
         if sent:
             say(f"🎮 {sent} new GTA 6 clips from '{src['title'][:50]}'. Approve the keepers and I'll post them.")

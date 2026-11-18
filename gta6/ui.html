@@ -624,7 +624,7 @@ function renderPosted() {
         ${c.campaign_url && c.status === "posted" ? `<div class="s" style="margin-top:6px"><a href="${href(c.campaign_url)}" target="_blank" rel="noopener">Campaign page ↗</a></div>` : ""}
       </div></div>`;
   set("posted", `<div class="panel"><h2>Approved, waiting for their slot</h2>
-      <p class="hint">Up to 4 a day per account on each platform, at least 45 minutes apart, ${S.post_hours[0]}:00–${S.post_hours[1]}:00.</p>
+      <p class="hint">Up to 10 a day per account on each platform, at least 45 minutes apart, ${S.post_hours[0]}:00–${S.post_hours[1]}:00.</p>
       <div class="list">${q.map(row).join("") || `<div class="empty">Nothing waiting.</div>`}</div></div>
     <div class="panel"><h2>Posted</h2><p class="hint">Newest first. Links open the live post.</p>
       <div class="list">${done.map(row).join("") || `<div class="empty">Nothing posted yet.</div>`}</div></div>`);
@@ -699,6 +699,7 @@ function renderSources() {
         <div class="field"><span class="label">Credit line</span><input type="text" name="credit" placeholder="@creator on YouTube" maxlength="60"></div>
         <div class="field"><span class="label">Clips from it are for</span><select name="campaign_id">${campaignOptions()}</select></div>
         <label class="check"><input type="checkbox" name="permitted"> This creator allows clipping (or it's a campaign's own footage).</label>
+        <div class="s" style="margin-top:8px">When this channel is live on YouTube, the agent records the first 10 minutes and sends 4 clips, then 6 more from every 30 minutes after.</div>
         <div class="row end" style="margin-top:10px"><button class="btn go" type="submit">Add channel</button></div></form></div>
     ${S.links.length ? `<div class="panel"><h2>Campaign footage links</h2><p class="hint">Tried once each. If one won't download, save it into a folder tied to the campaign.</p>
       <div class="list">${S.links.map((l, i) => `<div class="item"><div class="grow"><div class="t"><a href="${href(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a></div>

@@ -208,6 +208,8 @@ def _run(root: Path, web: Web) -> None:
         sys.modules.pop(name)
     from . import agent, app, campaigns, connect, net, post, tg
     net.req = web
+    agent.live_now = lambda link: None                     # nothing is live unless a test says so
+    agent.POST_PER_DAY, agent.PER_ACCOUNT_DAY, agent.MAX_WAITING = 4, 4, 10      # small caps keep the checks short
     tags = agent.rank_hashtags([{"title": "Chaos #GTA6 #shorts #vicecity", "view_count": 990},
                                 {"title": "x", "description": "#gta6 #2026 #fyp", "view_count": 90}])
     agent.research = lambda force=False: {"keywords": [{"phrase": "gta 6 map", "score": 9}], "hashtags": tags}
@@ -237,6 +239,20 @@ def _run(root: Path, web: Web) -> None:
     assert agent.next_source(st)["title"] == "night drive"
     assert agent.next_source({**st, "folders": []})["id"] == "g1"
     assert agent.next_source({**st, "folders": [], "used": ["g1"]}) is None
+
+    # --- a live stream: recorded first, skipped when it isn't GTA 6, and a failed recording falls back ---
+    rec = root / "live.mp4"
+    agent.live_now = lambda link: {"id": "lv1", "title": "GTA 6 LIVE: first look", "is_live": True, "url": "m3u8"}
+    agent.record_live = lambda info, minutes: (rec.write_bytes(b"x"), rec)[1]
+    src = agent.next_source(st)
+    assert src["live"] and src["id"] == "live:live.mp4" and src["credit"] == "@creator on YouTube", src
+    assert src["count"] == 4 and agent.next_source(st)["count"] == 6, "first stretch is short, later ones long"
+    agent.live_now = lambda link: {"id": "lv2", "title": "Minecraft live", "is_live": True, "url": "m3u8"}
+    assert agent.next_source(st)["title"] == "night drive"
+    agent.live_now = lambda link: {"id": "lv1", "title": "GTA VI live", "is_live": True, "url": "m3u8"}
+    agent.record_live = lambda info, minutes: (_ for _ in ()).throw(RuntimeError("the stream gave no video"))
+    assert agent.next_source(st)["title"] == "night drive"
+    agent.live_now = lambda link: None
 
     # --- a clip round, through a host app's bot (no bot of its own yet) ---
     assert agent.tick(force=True).startswith("Made 2 clips"), agent.status

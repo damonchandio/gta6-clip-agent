@@ -9,10 +9,11 @@ Made by **Damon Dynamics**. Runs on your own computer. Free to use.
 ## What it does
 
 - **Finds footage.** It watches your own capture folders (your PS5 or PC recordings), YouTube channels whose creators allow clipping, and the footage that paid campaigns provide.
+- **Clips live streams.** When a channel you added is live on YouTube, it records the first 10 minutes and cuts 4 clips so they arrive early, then 6 more from every 30 minutes after, while the stream is still running.
 - **Cuts clips.** It transcribes the video, picks the strongest moments with AI, and renders 1080×1920 clips. Each clip gets word-by-word captions, a hook title and a face-tracked crop. Gameplay with no talking is cut on its shot changes.
 - **Researches hashtags.** It reads what GTA 6 fans search for on YouTube and the hashtags on the top GTA 6 Shorts, and mixes the strongest into every caption.
 - **Asks you first.** You approve, edit or bin each clip, in the app or with buttons in a Telegram chat. Nothing is posted without a yes.
-- **Posts on a schedule.** It posts at most 4 a day per account on each platform, at least 45 minutes apart, between 11:00 and 22:00, and retries if a post fails.
+- **Posts on a schedule.** It makes and posts at most 10 a day per account on each platform, at least 45 minutes apart, between 11:00 and 22:00, and retries if a post fails.
 - **Finds paid campaigns.** Every 3 hours it checks [Content Rewards](https://contentrewards.com) for GTA campaigns, and the search box finds campaigns for any keyword. Clips for a campaign follow its rules: `#ad` and the brand's required hashtags and mentions.
 
 | Review | Campaigns | Accounts |

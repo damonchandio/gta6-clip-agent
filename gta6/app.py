@@ -276,6 +276,7 @@ def main() -> None:
                         handlers=[logging.StreamHandler(), logging.FileHandler(agent.HOME / "agent.log", encoding="utf-8")])
     url = f"http://127.0.0.1:{PORT}/"
     try:
+        ThreadingHTTPServer.allow_reuse_address = os.name != "nt"    # on Windows, reuse lets a second copy share the port
         server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError:
         print("The GTA 6 clip agent is already running. Opening its window.")
